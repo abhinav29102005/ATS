@@ -997,7 +997,7 @@ else:
                 st.markdown('<div class="content-card">', unsafe_allow_html=True)
                 st.markdown('<div class="card-title">Experience Levels</div>', unsafe_allow_html=True)
                 df = pd.DataFrame(stats['experience_distribution'])
-                fig = px.pie(df, values='count', names='range', color_discrete_sequence=['#2c5282', '#4299e1', '#93c5fd', '#dbeafe'])
+                fig = px.pie(df, values='count', names='range', color_discrete_sequence=['#2c5282', '#dbeafe'])
                 fig.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
