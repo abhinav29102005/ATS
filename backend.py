@@ -7,7 +7,9 @@ import pandas as pd
 from supabase import create_client, Client
 import uuid
 import hashlib
-
+# Supabase Configuration
+SUPABASE_URL = "https://xsgjinwzxzkpjwwenjzj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzZ2ppbnd6eHprcGp3d2VuanpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0NTIzMDcsImV4cCI6MjA3ODAyODMwN30.KnEN3YQuKk_tO7W47Kf_vmebu7QbtHOuxX2KMDhsn_k"
 @st.cache_resource
 def load_nlp():
     """Load NLP model with caching"""
