@@ -914,6 +914,9 @@ else:
                             <div style="font-size: 1.3rem; color: {colors[idx]}; font-weight: 700; margin: 12px 0;">
                                 {medals[idx].split()[1]}
                             </div>
+                            <div style="font-size: 1.1rem; color: #19395D; font-weight: 600; margin: 15px 0; word-break: break-all; padding: 0 10px;">
+                                {row['email']}
+                            </div>
                             <div style="font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #19395D 0%, #1E5796 100%);
                             -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 15px 0;">
                                 {row['score']:.1f}%
@@ -937,7 +940,7 @@ else:
                         <span class="leaderboard-rank">#{row['rank']}</span>
                         <div style="flex: 1;">
                             <div style="font-weight: 600; color: #19395D; font-size: 1.15rem;">
-                                Participant: {row['participant_id'][:14]}... {badge}
+                                {row['email']} {badge}
                             </div>
                             <div style="color: #5BC0DE; margin-top: 8px; font-size: 0.95rem;">
                                 Skills: {row['skills_count']} | Experience: {row['experience']} years
