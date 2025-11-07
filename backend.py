@@ -183,32 +183,58 @@ def get_participant_scores(participant_id):
 
 @st.cache_data(ttl=30)
 def get_leaderboard():
-    """Get top 10 UNIQUE participants by best score"""
+    """Get top 10 UNIQUE participants by best score WITH EMAIL"""
     try:
         if not supabase:
             return pd.DataFrame()
         
-        # Get best score for each participant
-        response = supabase.rpc('get_leaderboard').execute()
+        # Get all applications with participant details
+        response = supabase.table('applications')\
+            .select('*, participants(email, name)')\
+            .execute()
         
         if response.data:
             df = pd.DataFrame(response.data)
+            
+            # Extract email from nested participants object
+            df['email'] = df['participants'].apply(lambda x: x['email'] if x else 'N/A')
+            df['name'] = df['participants'].apply(lambda x: x['name'] if x else 'N/A')
+            
+            # Get best score per participant
+            df = df.loc[df.groupby('participant_id')['score'].idxmax()]
+            df = df.sort_values('score', ascending=False).head(10)
             df['rank'] = range(1, len(df) + 1)
             df = df.rename(columns={'experience_years': 'experience'})
-            return df.head(10)
+            
+            return df[['rank', 'participant_id', 'email', 'name', 'score', 'skills_count', 'experience']]
+        
         return pd.DataFrame()
-    except:
-        # Fallback: group by participant_id and get max score
+    except Exception as e:
+        # Fallback: Try alternative approach
         try:
-            response = supabase.table('applications').select('*').execute()
-            if response.data:
-                df = pd.DataFrame(response.data)
+            # Get applications
+            apps_response = supabase.table('applications').select('*').execute()
+            # Get participants
+            parts_response = supabase.table('participants').select('*').execute()
+            
+            if apps_response.data and parts_response.data:
+                df_apps = pd.DataFrame(apps_response.data)
+                df_parts = pd.DataFrame(parts_response.data)
+                
+                # Merge to get emails
+                df = df_apps.merge(df_parts[['id', 'email', 'name']], 
+                                  left_on='participant_id', 
+                                  right_on='id', 
+                                  how='left')
+                
                 # Get best score per participant
                 df = df.loc[df.groupby('participant_id')['score'].idxmax()]
                 df = df.sort_values('score', ascending=False).head(10)
                 df['rank'] = range(1, len(df) + 1)
                 df = df.rename(columns={'experience_years': 'experience'})
-                return df
+                
+                return df[['rank', 'participant_id', 'email', 'name', 'score', 'skills_count', 'experience']]
+            
             return pd.DataFrame()
         except:
             return pd.DataFrame()
