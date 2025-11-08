@@ -1,1 +1,1 @@
-# ATS Score Detector
+# ATS
