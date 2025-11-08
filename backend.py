@@ -159,19 +159,15 @@ def check_plagiarism(resume_text, reference_corpus=[]):
         return 0, "No reference data"
     
     try:
-        # Create corpus with current resume and references
         corpus = [resume_text] + reference_corpus
         
-        # Create TF-IDF vectors
         vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
         tfidf_matrix = vectorizer.fit_transform(corpus)
         
-        # Calculate similarity between current resume and all references
         similarities = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])
         
         max_similarity = np.max(similarities) if similarities.size > 0 else 0
         
-        # Convert to percentage
         plagiarism_score = round(max_similarity * 100, 2)
         
         return plagiarism_score, "Checked"
@@ -195,7 +191,7 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     
     jd_lower = job_description.lower()
     
-    # 1. SKILLS MATCHING 
+    # 1 SKILLS MATCHING 
     matched_skills = [s for s in parsed['skills'] if s.lower() in jd_lower]
     if parsed['skills']:
         skills_score = (len(matched_skills) / len(parsed['skills'])) * 30
@@ -204,7 +200,7 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     else:
         feedback.append("No skills detected")
     
-    # 2. WORK EXPERIENCE 
+    # 2 WORK EXPERIENCE 
     exp_match = re.search(r'(\d+)\+?\s*years?', job_description.lower())
     required_exp = int(exp_match.group(1)) if exp_match else 2
     
@@ -218,7 +214,7 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     else:
         feedback.append("No experience detected")
     
-    # 3. PROJECTS VERIFICATION 
+    # 3 PROJECTS VERIFICATION 
     project_verification, verified_skills = validate_projects(parsed['projects_section'], parsed['skills'])
     project_score = project_verification * 20
     score += project_score
@@ -230,7 +226,7 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
         feedback.append("Projects don't demonstrate claimed skills")
         penalties.append("Skills not verified in projects (-3 points)")
         score -= 3
-    # 4. EDUCATION MATCH 
+    # 4 EDUCATION MATCH 
     education_score, edu_penalties = validate_education(parsed['education_section'], jd_education)
     score += education_score
     penalties.extend(edu_penalties)
@@ -242,7 +238,7 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     else:
         feedback.append("Education doesn't match requirements")
     
-    # 5. PLAGIARISM CHECK 
+    # 5 PLAGIARISM CHECK 
     plagiarism_score, plag_status = check_plagiarism(resume_text, reference_corpus)
     
     if plagiarism_score > 80:
