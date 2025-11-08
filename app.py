@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 import time
 from PIL import Image
+import os
 from backend import (
     extract_pdf_text, 
     calculate_ats_score, 
@@ -17,9 +18,17 @@ from backend import (
     get_participant_scores
 )
 
+try:
+    logo_exists = os.path.exists("mlsc.png")
+    if logo_exists:
+        logo_image = Image.open("mlsc.png")
+except:
+    logo_exists = False
+    logo_image = None
+
 st.set_page_config(
     page_title="MLSC Competition Portal",
-    page_icon="mlsc.png",
+    page_icon="🏆" if not logo_exists else "mlsc.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -30,6 +39,10 @@ if 'participant_id' not in st.session_state:
     st.session_state.participant_id = None
 if 'participant_data' not in st.session_state:
     st.session_state.participant_data = {}
+if 'upload_count' not in st.session_state:
+    st.session_state.upload_count = 0
+if 'last_submission_time' not in st.session_state:
+    st.session_state.last_submission_time = None
 
 st.markdown("""
     <style>
@@ -39,7 +52,6 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
     
-    /* Main Background */
     .main {
         background: linear-gradient(135deg, #19395D 0%, #1E5796 100%);
         background-attachment: fixed;
@@ -49,13 +61,11 @@ st.markdown("""
         background: transparent;
     }
     
-    /* Remove default Streamlit padding */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 0rem;
     }
     
-    /* Logo Header */
     .logo-header {
         display: flex;
         align-items: center;
@@ -79,12 +89,12 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        color: #19395D;
         font-size: 1.8rem;
         font-weight: 700;
         margin: 0;
     }
     
-    /* Glass Morphism Cards */
     .glass-card {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
@@ -117,7 +127,6 @@ st.markdown("""
         margin-bottom: 25px;
     }
     
-    /* Registration Container */
     .register-container {
         background: rgba(255, 255, 255, 0.98);
         backdrop-filter: blur(20px);
@@ -134,6 +143,7 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        color: #19395D;
         font-size: 2.2rem;
         font-weight: 700;
         margin-bottom: 12px;
@@ -148,12 +158,12 @@ st.markdown("""
         font-weight: 500;
     }
     
-    /* Card Headers */
     .card-header {
         background: linear-gradient(135deg, #19395D 0%, #1E5796 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        color: #19395D;
         font-size: 1.8rem;
         font-weight: 700;
         margin-bottom: 30px;
@@ -161,7 +171,6 @@ st.markdown("""
         border-bottom: 3px solid #5BC0DE;
     }
     
-    /* Score Display - Stunning Design */
     .score-display {
         text-align: center;
         padding: 60px 40px;
@@ -208,7 +217,6 @@ st.markdown("""
         z-index: 1;
     }
     
-    /* Metric Cards */
     .metric-card {
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(230, 228, 230, 0.98) 100%);
         backdrop-filter: blur(10px);
@@ -232,6 +240,7 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        color: #19395D;
         margin: 15px 0;
     }
     
@@ -243,7 +252,6 @@ st.markdown("""
         font-weight: 700;
     }
     
-    /* Leaderboard Items */
     .leaderboard-rank {
         display: inline-flex;
         align-items: center;
@@ -288,7 +296,6 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(91, 192, 222, 0.4);
     }
     
-    /* Limit Badges */
     .limit-badge {
         display: inline-block;
         padding: 12px 24px;
@@ -314,7 +321,6 @@ st.markdown("""
         color: #c62828;
     }
     
-    /* Buttons */
     .stButton>button {
         background: linear-gradient(135deg, #5BC0DE 0%, #1E5796 100%);
         color: white;
@@ -342,12 +348,10 @@ st.markdown("""
         box-shadow: none;
     }
     
-    /* Progress Bar */
     .stProgress > div > div {
         background: linear-gradient(135deg, #5BC0DE 0%, #1E5796 100%);
     }
     
-    /* Input Fields */
     .stTextInput>div>div>input,
     .stTextArea>div>div>textarea {
         border-radius: 12px;
@@ -363,7 +367,6 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(91, 192, 222, 0.2);
     }
     
-    /* File Uploader */
     .stFileUploader {
         background: rgba(91, 192, 222, 0.1);
         border-radius: 15px;
@@ -371,7 +374,6 @@ st.markdown("""
         padding: 25px;
     }
     
-    /* Sidebar */
     .css-1d391kg, [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #19395D 0%, #1E5796 100%);
     }
@@ -380,7 +382,6 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Sidebar Headers - Make them explicitly white */
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3,
@@ -392,22 +393,20 @@ st.markdown("""
         -webkit-text-fill-color: white !important;
     }
     
-    /* Sidebar Markdown text */
     [data-testid="stSidebar"] .element-container p,
     [data-testid="stSidebar"] .stMarkdown {
         color: white !important;
     }
     
-    /* Headers */
     h1, h2, h3 {
         background: linear-gradient(135deg, #19395D 0%, #1E5796 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        color: #19395D;
         font-weight: 700;
     }
     
-    /* Info Box */
     .info-box {
         background: linear-gradient(135deg, rgba(91, 192, 222, 0.15) 0%, rgba(30, 87, 150, 0.15) 100%);
         backdrop-filter: blur(10px);
@@ -418,7 +417,6 @@ st.markdown("""
         box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
     }
     
-    /* Competition Banner */
     .competition-banner {
         background: linear-gradient(135deg, #19395D 0%, #1E5796 50%, #5BC0DE 100%);
         color: white;
@@ -447,7 +445,6 @@ st.markdown("""
         100% { transform: rotate(360deg); }
     }
     
-    /* Skill Tags */
     .skill-tag {
         display: inline-block;
         padding: 10px 20px;
@@ -466,7 +463,6 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(91, 192, 222, 0.4);
     }
     
-    /* Success/Error Messages */
     .stSuccess {
         background: linear-gradient(135deg, rgba(76, 175, 80, 0.15) 0%, rgba(56, 142, 60, 0.15) 100%);
         border: 2px solid #4caf50;
@@ -498,27 +494,22 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def show_logo_header(title):
-    try:
-        logo = Image.open("mlsc.png")
+    if logo_exists and logo_image:
         st.markdown('<div class="logo-header">', unsafe_allow_html=True)
         col1, col2 = st.columns([1, 15])
         with col1:
-            st.image(logo, width=55)
+            st.image(logo_image, width=55)
         with col2:
             st.markdown(f"<div class='logo-title'>{title}</div>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    except:
+    else:
         st.markdown(f"<div class='logo-header'><div class='logo-title'>{title}</div></div>", unsafe_allow_html=True)
 
-# registration page
 if not st.session_state.registered:
-    try:
-        logo = Image.open("mlsc.png")
+    if logo_exists and logo_image:
         st.markdown('<div class="logo-fixed">', unsafe_allow_html=True)
-        st.image(logo, width=60)
+        st.image(logo_image, width=60)
         st.markdown('</div>', unsafe_allow_html=True)
-    except:
-        pass
     
     st.markdown("""
         <div class="competition-banner">
@@ -533,7 +524,7 @@ if not st.session_state.registered:
         st.markdown('<div class="register-title">Participant Registration</div>', unsafe_allow_html=True)
         st.markdown('<div class="register-subtitle">Join the competition and showcase your skills</div>', unsafe_allow_html=True)
         
-        with st.form("registration_form", clear_on_submit=False):
+        with st.form("registration_form", clear_on_submit=True):
             name = st.text_input(
                 "Full Name",
                 placeholder="Enter your complete name",
@@ -559,10 +550,10 @@ if not st.session_state.registered:
                 errors = []
                 if not name or len(name) < 3:
                     errors.append("Name must be at least 3 characters")
-                if not email or '@' not in email or '@thapar.edu' not in email.lower():
-                    errors.append("Valid Thapar email required (e.g., @thapar.edu)")
+                if not email or '@thapar.edu' not in email.lower():
+                    errors.append("Valid Thapar email required (must end with @thapar.edu)")
                 if not mobile or len(mobile.replace('+', '').replace(' ', '').replace('-', '')) < 10:
-                    errors.append("Valid mobile number required")
+                    errors.append("Valid mobile number required (at least 10 digits)")
                 
                 if errors:
                     for error in errors:
@@ -578,6 +569,11 @@ if not st.session_state.registered:
                             st.info("Welcome back! You are already registered.")
                         else:
                             participant_id = register_participant(name, email, mobile)
+                            
+                            if not participant_id:
+                                st.error("Registration failed. Please try again.")
+                                st.stop()
+                            
                             st.success("Registration Successful!")
                         
                         st.session_state.registered = True
@@ -587,13 +583,13 @@ if not st.session_state.registered:
                             'email': email,
                             'mobile': mobile
                         }
+                        st.session_state.upload_count = get_participant_upload_count(participant_id)
                         
                         time.sleep(1)
                         st.rerun()
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # competition info
         st.markdown("""
         <div class="info-box">
             <h4 style='color: #1E5796; margin-top: 0; font-weight: 700;'>Competition Rules</h4>
@@ -607,18 +603,16 @@ if not st.session_state.registered:
         </div>
         """, unsafe_allow_html=True)
 
-# main
 else:
-    upload_count = get_participant_upload_count(st.session_state.participant_id)
+    if 'upload_count' not in st.session_state or st.session_state.upload_count == 0:
+        st.session_state.upload_count = get_participant_upload_count(st.session_state.participant_id)
+    
+    upload_count = st.session_state.upload_count
     MAX_UPLOADS = 5
     
-    # sidebar
     with st.sidebar:
-        try:
-            logo = Image.open("mlsc.png")
-            st.image(logo, width=130)
-        except:
-            pass
+        if logo_exists and logo_image:
+            st.image(logo_image, width=130)
         
         st.markdown("---")
         st.markdown("### Participant Profile")
@@ -657,9 +651,10 @@ else:
             st.session_state.registered = False
             st.session_state.participant_id = None
             st.session_state.participant_data = {}
+            st.session_state.upload_count = 0
+            st.session_state.last_submission_time = None
             st.rerun()
     
-    # PAGE 1: submit Application
     if page == "Submit Application":
         show_logo_header("Submit Your Resume")
         
@@ -673,6 +668,12 @@ else:
                 </div>
             """, unsafe_allow_html=True)
             st.stop()
+        
+        if st.session_state.last_submission_time:
+            time_since_last = (datetime.now() - st.session_state.last_submission_time).seconds
+            if time_since_last < 30:
+                st.warning(f"⚠ Please wait {30 - time_since_last} seconds before next submission")
+                st.stop()
         
         col1, col2 = st.columns([2, 1])
         
@@ -688,17 +689,21 @@ else:
             uploaded_file = st.file_uploader(
                 "Upload Your Resume (PDF)",
                 type=['pdf'],
-                help="Maximum file size: 20MB"
+                help="Maximum file size: 20MB",
+                key=f"file_uploader_{upload_count}"
             )
             
             job_description = st.text_area(
                 "Target Job Description",
                 height=250,
                 placeholder="Paste the job description you're targeting...\n\nExample:\nWe are looking for a Software Developer with 3+ years of experience...",
-                help="Paste the complete job description"
+                help="Paste the complete job description",
+                key=f"job_desc_{upload_count}"
             )
             
-            if st.button("Submit & Calculate Score", type="primary", use_container_width=True, disabled=(upload_count >= MAX_UPLOADS)):
+            submit_disabled = upload_count >= MAX_UPLOADS
+            
+            if st.button("Submit & Calculate Score", type="primary", use_container_width=True, disabled=submit_disabled):
                 if uploaded_file and job_description:
                     try:
                         progress_bar = st.progress(0)
@@ -707,32 +712,42 @@ else:
                         status_text.text("📄 Reading your resume...")
                         progress_bar.progress(20)
                         time.sleep(0.4)
+                        
                         text = extract_pdf_text(uploaded_file)
                         
                         status_text.text("🤖 Analyzing with AI engine...")
                         progress_bar.progress(50)
                         time.sleep(0.6)
+                        
                         result = calculate_ats_score(text, job_description)
                         
                         status_text.text("💾 Saving results...")
                         progress_bar.progress(80)
                         time.sleep(0.4)
                         
-                        save_participant_application(
+                        save_success = save_participant_application(
                             result['score'],
                             result['skills'],
                             result['experience_years'],
                             st.session_state.participant_id
                         )
                         
+                        if not save_success:
+                            st.error("Failed to save application. Please try again.")
+                            progress_bar.empty()
+                            status_text.empty()
+                            st.stop()
+                        
+                        st.session_state.upload_count += 1
+                        st.session_state.last_submission_time = datetime.now()
+                        
                         progress_bar.progress(100)
                         time.sleep(0.3)
                         progress_bar.empty()
                         status_text.empty()
                         
-                        st.success(f"✅ Submission {upload_count + 1}/{MAX_UPLOADS} successful!")
+                        st.success(f"✅ Submission {st.session_state.upload_count}/{MAX_UPLOADS} successful!")
                         
-                        # score Display
                         score = result['score']
                         if score >= 80:
                             verdict = "Excellent Match"
@@ -748,7 +763,6 @@ else:
                             </div>
                         """, unsafe_allow_html=True)
                         
-                        # gauge Chart
                         fig = go.Figure(go.Indicator(
                             mode="gauge+number",
                             value=score,
@@ -777,7 +791,6 @@ else:
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         
-                        # analysis
                         st.markdown("### Analysis Summary")
                         col_a, col_b = st.columns(2)
                         with col_a:
@@ -794,6 +807,11 @@ else:
                                 for skill in result['skills']
                             ])
                             st.markdown(f'<div style="text-align: center;">{skills_html}</div>', unsafe_allow_html=True)
+                        
+                        if result.get('penalties'):
+                            st.markdown("### ⚠ Warnings")
+                            for penalty in result['penalties']:
+                                st.warning(penalty)
                         
                         time.sleep(1.5)
                         st.rerun()
@@ -836,7 +854,6 @@ else:
             
             st.markdown('</div>', unsafe_allow_html=True)
     
-    # PAGE 2: my Scores
     elif page == "My Scores":
         show_logo_header("My Score History")
         
@@ -857,6 +874,7 @@ else:
             st.markdown("### All Submissions")
             
             for idx, row in my_scores.iterrows():
+                created_at = pd.to_datetime(row.get('created_at', datetime.now()))
                 st.markdown(f"""
                     <div class="leaderboard-item">
                         <div style="flex: 1;">
@@ -865,7 +883,7 @@ else:
                             </div>
                             <div style="color: #5BC0DE; margin-top: 8px; font-size: 0.95rem;">
                                 Skills: {row['skills_count']} | Experience: {row['experience_years']} yrs | 
-                                Date: {pd.to_datetime(row['submitted_at']).strftime('%d-%m-%Y %H:%M')}
+                                Date: {created_at.strftime('%d-%m-%Y %H:%M')}
                             </div>
                         </div>
                         <div style="font-size: 2.2rem; font-weight: 800; color: #1E5796;">
@@ -883,7 +901,6 @@ else:
                 </div>
             """, unsafe_allow_html=True)
     
-    # PAGE 3: leaderboard
     elif page == "Leaderboard":
         show_logo_header("Competition Leaderboard")
         
@@ -892,14 +909,14 @@ else:
         if not leaderboard.empty:
             st.markdown('<div class="card-header">Top 10 Performers</div>', unsafe_allow_html=True)
             
-            # Top 3
             st.markdown("### Top 3 Winners")
             cols = st.columns(3)
             
             medals = ["🥇 Champion", "🥈 Runner-up", "🥉 Third Place"]
             colors = ["#FFD700", "#C0C0C0", "#CD7F32"]
             
-            for idx, (_, row) in enumerate(leaderboard.head(3).iterrows()):
+            for idx in range(min(3, len(leaderboard))):
+                row = leaderboard.iloc[idx]
                 with cols[idx]:
                     st.markdown(f"""
                         <div style="text-align: center; padding: 35px 25px; 
@@ -957,14 +974,12 @@ else:
                 </div>
             """, unsafe_allow_html=True)
     
-    # PAGE 4: stats
     elif page == "Competition Stats":
         show_logo_header("Competition Statistics")
         
         stats = get_competition_stats()
         
         if stats and stats['total_participants'] > 0:
-            # Metrics
             col1, col2, col3, col4 = st.columns(4)
             
             metrics_data = [
@@ -984,7 +999,6 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
             
-            # Charts
             col1, col2 = st.columns(2)
             
             with col1:
