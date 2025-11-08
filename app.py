@@ -17,7 +17,6 @@ from backend import (
     get_participant_scores
 )
 
-# Page config
 st.set_page_config(
     page_title="MLSC Competition Portal",
     page_icon="mlsc.png",
@@ -25,7 +24,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize session state
 if 'registered' not in st.session_state:
     st.session_state.registered = False
 if 'participant_id' not in st.session_state:
@@ -33,7 +31,6 @@ if 'participant_id' not in st.session_state:
 if 'participant_data' not in st.session_state:
     st.session_state.participant_data = {}
 
-# Custom CSS - Beautiful Modern Design with Color Scheme
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -500,7 +497,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Logo Header Function
 def show_logo_header(title):
     try:
         logo = Image.open("mlsc.png")
@@ -514,9 +510,8 @@ def show_logo_header(title):
     except:
         st.markdown(f"<div class='logo-header'><div class='logo-title'>{title}</div></div>", unsafe_allow_html=True)
 
-# REGISTRATION PAGE
+# registration page
 if not st.session_state.registered:
-    # Fixed logo in top-left corner
     try:
         logo = Image.open("mlsc.png")
         st.markdown('<div class="logo-fixed">', unsafe_allow_html=True)
@@ -598,7 +593,7 @@ if not st.session_state.registered:
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Competition Info
+        # competition info
         st.markdown("""
         <div class="info-box">
             <h4 style='color: #1E5796; margin-top: 0; font-weight: 700;'>Competition Rules</h4>
@@ -612,12 +607,12 @@ if not st.session_state.registered:
         </div>
         """, unsafe_allow_html=True)
 
-# MAIN APPLICATION
+# main
 else:
     upload_count = get_participant_upload_count(st.session_state.participant_id)
     MAX_UPLOADS = 5
     
-    # Sidebar
+    # sidebar
     with st.sidebar:
         try:
             logo = Image.open("mlsc.png")
@@ -664,7 +659,7 @@ else:
             st.session_state.participant_data = {}
             st.rerun()
     
-    # PAGE 1: Submit Application
+    # PAGE 1: submit Application
     if page == "Submit Application":
         show_logo_header("Submit Your Resume")
         
@@ -737,7 +732,7 @@ else:
                         
                         st.success(f"✅ Submission {upload_count + 1}/{MAX_UPLOADS} successful!")
                         
-                        # Score Display
+                        # score Display
                         score = result['score']
                         if score >= 80:
                             verdict = "Excellent Match"
@@ -753,7 +748,7 @@ else:
                             </div>
                         """, unsafe_allow_html=True)
                         
-                        # Gauge Chart
+                        # gauge Chart
                         fig = go.Figure(go.Indicator(
                             mode="gauge+number",
                             value=score,
@@ -782,7 +777,7 @@ else:
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         
-                        # Analysis
+                        # analysis
                         st.markdown("### Analysis Summary")
                         col_a, col_b = st.columns(2)
                         with col_a:
@@ -841,7 +836,7 @@ else:
             
             st.markdown('</div>', unsafe_allow_html=True)
     
-    # PAGE 2: My Scores
+    # PAGE 2: my Scores
     elif page == "My Scores":
         show_logo_header("My Score History")
         
@@ -888,7 +883,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
     
-    # PAGE 3: Leaderboard
+    # PAGE 3: leaderboard
     elif page == "Leaderboard":
         show_logo_header("Competition Leaderboard")
         
@@ -962,7 +957,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
     
-    # PAGE 4: Stats
+    # PAGE 4: stats
     elif page == "Competition Stats":
         show_logo_header("Competition Statistics")
         

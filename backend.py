@@ -10,7 +10,7 @@ import uuid
 @st.cache_resource
 def load_nlp():
     try:
-        return spacy.load("en_core_web_sm")
+        return spacy.load("en_core_web_sm") 
     except:
         return None
 
@@ -33,11 +33,11 @@ def extract_pdf_text(uploaded_file):
         doc.close()
         return text
     except Exception as e:
-        raise Exception(f"PDF extraction error: {str(e)}")
+        raise Exception(f"pdf extraction error: {str(e)}")
 
 def parse_resume(text):
     if not nlp:
-        raise Exception("NLP model not loaded")
+        raise Exception("nlp error")
     
     skills_list = ['Python', 'Java', 'JavaScript', 'SQL', 'AWS', 'Docker', 'Kubernetes',
                    'React', 'Node.js', 'Django', 'Flask', 'PostgreSQL', 'MongoDB',
@@ -47,11 +47,9 @@ def parse_resume(text):
     experience_years = max([int(m) for m in re.findall(r'(\d+)\+?\s*years?', text.lower())] or [0])
     
     return {'skills': skills, 'experience_years': experience_years}
-
 def calculate_ats_score(resume_text, job_description):
     parsed = parse_resume(resume_text)
     score = 0
-    
     jd_lower = job_description.lower()
     matched_skills = [s for s in parsed['skills'] if s.lower() in jd_lower]
     if parsed['skills']:
@@ -74,7 +72,6 @@ def calculate_ats_score(resume_text, job_description):
     return {**parsed, 'score': round(min(score, 100), 2)}
 
 def check_participant_exists(email):
-    """Check if participant already registered"""
     try:
         if not supabase:
             return None
@@ -82,13 +79,10 @@ def check_participant_exists(email):
         return response.data[0] if response.data else None
     except:
         return None
-
 def register_participant(name, email, mobile):
-    """Register new participant and return UUID"""
     try:
         if not supabase:
             return str(uuid.uuid4())
-        
         data = {
             'id': str(uuid.uuid4()),
             'name': name,
@@ -98,19 +92,15 @@ def register_participant(name, email, mobile):
             'view_count': 0,
             'registered_at': datetime.now().isoformat()
         }
-        
         response = supabase.table('participants').insert(data).execute()
         return data['id']
     except:
         return str(uuid.uuid4())
-
 def save_participant_application(score, skills, experience, participant_id):
-    """Save competition application and increment upload count"""
     try:
         if not supabase:
             return
-        
-        # Save application
+        # saving app
         data = {
             'score': float(score),
             'skills': skills,
@@ -119,10 +109,8 @@ def save_participant_application(score, skills, experience, participant_id):
             'participant_id': participant_id,
             'submitted_at': datetime.now().isoformat()
         }
-        
         supabase.table('applications').insert(data).execute()
-        
-        # Increment upload count
+        # upload cnt ++
         response = supabase.table('participants').select('upload_count').eq('id', participant_id).execute()
         if response.data:
             current_count = response.data[0]['upload_count']
@@ -132,7 +120,6 @@ def save_participant_application(score, skills, experience, participant_id):
         raise Exception(f"Submission error: {str(e)}")
 
 def get_participant_upload_count(participant_id):
-    """Get number of uploads by participant"""
     try:
         if not supabase:
             return 0
@@ -142,7 +129,6 @@ def get_participant_upload_count(participant_id):
         return 0
 
 def get_participant_view_count(participant_id):
-    """Get number of score views by participant"""
     try:
         if not supabase:
             return 0
@@ -164,7 +150,7 @@ def increment_view_count(participant_id):
         pass
 
 def get_participant_scores(participant_id):
-    """Get all scores for a specific participant"""
+    """scores for specific participant"""
     try:
         if not supabase:
             return pd.DataFrame()
@@ -183,12 +169,12 @@ def get_participant_scores(participant_id):
 
 @st.cache_data(ttl=30)
 def get_leaderboard():
-    """Get top 10 UNIQUE participants by best score WITH EMAIL"""
+    """top 10 participants by score"""
     try:
         if not supabase:
             return pd.DataFrame()
         
-        # Get all applications with participant details
+        # get all applications with participant details
         response = supabase.table('applications')\
             .select('*, participants(email, name)')\
             .execute()
@@ -196,11 +182,11 @@ def get_leaderboard():
         if response.data:
             df = pd.DataFrame(response.data)
             
-            # Extract email from nested participants object
+            # extract email from nested participants object
             df['email'] = df['participants'].apply(lambda x: x['email'] if x else 'N/A')
             df['name'] = df['participants'].apply(lambda x: x['name'] if x else 'N/A')
             
-            # Get best score per participant
+            # get best score per participant
             df = df.loc[df.groupby('participant_id')['score'].idxmax()]
             df = df.sort_values('score', ascending=False).head(10)
             df['rank'] = range(1, len(df) + 1)
@@ -210,24 +196,21 @@ def get_leaderboard():
         
         return pd.DataFrame()
     except Exception as e:
-        # Fallback: Try alternative approach
+        # exception handler
         try:
-            # Get applications
+            # get applications
             apps_response = supabase.table('applications').select('*').execute()
-            # Get participants
+            # get participants
             parts_response = supabase.table('participants').select('*').execute()
-            
             if apps_response.data and parts_response.data:
                 df_apps = pd.DataFrame(apps_response.data)
                 df_parts = pd.DataFrame(parts_response.data)
-                
-                # Merge to get emails
+                # merge to get emails
                 df = df_apps.merge(df_parts[['id', 'email', 'name']], 
                                   left_on='participant_id', 
                                   right_on='id', 
                                   how='left')
-                
-                # Get best score per participant
+                # get best score per participant
                 df = df.loc[df.groupby('participant_id')['score'].idxmax()]
                 df = df.sort_values('score', ascending=False).head(10)
                 df['rank'] = range(1, len(df) + 1)
@@ -246,33 +229,26 @@ def get_competition_stats():
         if not supabase:
             return None
         
-        # Get unique participants count
+        # get unique participants count
         participants_response = supabase.table('participants').select('id').execute()
         total_participants = len(participants_response.data) if participants_response.data else 0
-        
-        # Get applications
+        # get applications
         response = supabase.table('applications').select('*').execute()
-        
         if not response.data:
             return None
-        
         df = pd.DataFrame(response.data)
-        
-        # Get best score per participant for stats
+        # get best score per participant for stats
         df_best = df.loc[df.groupby('participant_id')['score'].idxmax()]
-        
         bins = [0, 60, 80, 100]
         labels = ['0-59%', '60-79%', '80-100%']
         df_best['score_range'] = pd.cut(df_best['score'], bins=bins, labels=labels, include_lowest=True)
         score_dist = df_best['score_range'].value_counts().reset_index()
         score_dist.columns = ['range', 'count']
-        
         exp_bins = [0, 2, 5, 10, 50]
         exp_labels = ['0-2 yrs', '2-5 yrs', '5-10 yrs', '10+ yrs']
         df_best['exp_range'] = pd.cut(df_best['experience_years'], bins=exp_bins, labels=exp_labels, include_lowest=True)
         exp_dist = df_best['exp_range'].value_counts().reset_index()
         exp_dist.columns = ['range', 'count']
-        
         return {
             'total_participants': total_participants,
             'avg_score': df_best['score'].mean(),
