@@ -13,7 +13,7 @@ import logging
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
-
+#spacy nlp
 @st.cache_resource
 def load_nlp():
     try:
@@ -28,7 +28,7 @@ def load_nlp():
         return None
 
 nlp = load_nlp()
-
+#supabase call
 @st.cache_resource
 def get_supabase_client():
     try:
@@ -45,7 +45,7 @@ def get_supabase_client():
         return None
 
 supabase: Client = get_supabase_client()
-
+#pdf validate
 def validate_pdf_file(uploaded_file):
     if uploaded_file is None:
         return False, "No file uploaded"
@@ -151,7 +151,7 @@ def extract_section(text, keywords):
             section_text += line + "\n"
     
     return section_text.strip()
-
+#projects and skills listed are same
 def validate_projects(projects_section, skills):
     if not projects_section or not skills:
         return 0, []
@@ -161,7 +161,7 @@ def validate_projects(projects_section, skills):
     verification_rate = len(verified_skills) / len(skills) if skills else 0
     
     return verification_rate, verified_skills
-
+#10 cg wali bkd
 def validate_education(education_section, jd_education):
     score = 0
     penalties = []
@@ -223,7 +223,7 @@ def validate_education(education_section, jd_education):
                 score += 5
     
     return max(0, score), penalties
-
+#penalty system
 def check_plagiarism(resume_text, reference_corpus=None):
     if not reference_corpus or len(reference_corpus) == 0:
         return 0, "No reference data"

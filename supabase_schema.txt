@@ -1,0 +1,65 @@
+DROP FUNCTION IF EXISTS get_leaderboard();
+DROP TABLE IF EXISTS applications CASCADE;
+DROP TABLE IF EXISTS participants CASCADE;
+
+CREATE TABLE participants (
+    id UUID PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    email VARCHAR(200) UNIQUE NOT NULL,
+    mobile VARCHAR(20) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE applications (
+    id BIGSERIAL PRIMARY KEY,
+    participant_id UUID NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+    score NUMERIC(5,2) NOT NULL CHECK (score >= 0 AND score <= 100),
+    skills_count INTEGER DEFAULT 0,
+    experience_years INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_applications_participant_id ON applications(participant_id);
+CREATE INDEX idx_applications_score ON applications(score DESC);
+CREATE INDEX idx_applications_created_at ON applications(created_at DESC);
+CREATE INDEX idx_participants_email ON participants(email);
+ALTER TABLE participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable read access for all users" ON participants
+    FOR SELECT USING (true);
+
+CREATE POLICY "Enable insert for all users" ON participants
+    FOR INSERT WITH CHECK (true);
+
+
+CREATE POLICY "Enable read access for all users" ON applications
+    FOR SELECT USING (true);
+
+CREATE POLICY "Enable insert for all users" ON applications
+    FOR INSERT WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION get_leaderboard()
+RETURNS TABLE (
+    participant_id UUID,
+    email VARCHAR,
+    score NUMERIC,
+    skills_count INTEGER,
+    experience INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        a.participant_id,
+        p.email,
+        MAX(a.score) as score,
+        (ARRAY_AGG(a.skills_count ORDER BY a.score DESC))[1] as skills_count,
+        (ARRAY_AGG(a.experience_years ORDER BY a.score DESC))[1] as experience
+    FROM applications a
+    JOIN participants p ON a.participant_id = p.id
+    GROUP BY a.participant_id, p.email
+    ORDER BY score DESC
+    LIMIT 10;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION get_leaderboard() TO anon;
+GRANT EXECUTE ON FUNCTION get_leaderboard() TO authenticated;
