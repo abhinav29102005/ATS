@@ -315,3 +315,163 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
         'penalties': penalties,
         'plagiarism_score': plagiarism_score
     }
+
+
+# database functions for competition management
+
+def register_participant(name, email, mobile):
+    """register a new participant in the competition"""
+    if not supabase:
+        return str(uuid.uuid4())
+    
+    try:
+        participant_id = str(uuid.uuid4())
+        data = {
+            'id': participant_id,
+            'name': name,
+            'email': email,
+            'mobile': mobile,
+            'created_at': datetime.now().isoformat()
+        }
+        supabase.table('participants').insert(data).execute()
+        return participant_id
+    except Exception as e:
+        st.error(f"registration error: {str(e)}")
+        return str(uuid.uuid4())
+
+
+def check_participant_exists(email):
+    """check if participant already registered"""
+    if not supabase:
+        return None
+    
+    try:
+        response = supabase.table('participants').select('*').eq('email', email).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
+    except Exception as e:
+        st.error(f"check error: {str(e)}")
+        return None
+
+
+def save_participant_application(score, skills, experience_years, participant_id):
+    """save participant's resume analysis result"""
+    if not supabase:
+        return
+    
+    try:
+        data = {
+            'participant_id': participant_id,
+            'score': score,
+            'skills_count': len(skills),
+            'experience_years': experience_years,
+            'submitted_at': datetime.now().isoformat()
+        }
+        supabase.table('applications').insert(data).execute()
+    except Exception as e:
+        st.error(f"save error: {str(e)}")
+
+
+def get_participant_upload_count(participant_id):
+    """get number of uploads for a participant"""
+    if not supabase:
+        return 0
+    
+    try:
+        response = supabase.table('applications').select('id').eq('participant_id', participant_id).execute()
+        return len(response.data) if response.data else 0
+    except Exception as e:
+        st.error(f"count error: {str(e)}")
+        return 0
+
+
+def get_participant_scores(participant_id):
+    """get all scores for a participant"""
+    if not supabase:
+        return pd.DataFrame()
+    
+    try:
+        response = supabase.table('applications').select('*').eq('participant_id', participant_id).order('submitted_at', desc=True).execute()
+        if response.data:
+            return pd.DataFrame(response.data)
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"scores error: {str(e)}")
+        return pd.DataFrame()
+
+
+def get_leaderboard():
+    """get top 10 participants with their best scores"""
+    if not supabase:
+        return pd.DataFrame()
+    
+    try:
+        # get best score for each participant
+        response = supabase.rpc('get_leaderboard').execute()
+        if response.data:
+            df = pd.DataFrame(response.data)
+            df['rank'] = range(1, len(df) + 1)
+            return df.head(10)
+        return pd.DataFrame()
+    except Exception as e:
+        # fallback: manual aggregation
+        try:
+            response = supabase.table('applications').select('participant_id, score, skills_count, experience_years').execute()
+            if response.data:
+                df = pd.DataFrame(response.data)
+                # get best score per participant
+                df = df.loc[df.groupby('participant_id')['score'].idxmax()]
+                df = df.sort_values('score', ascending=False).reset_index(drop=True)
+                df['rank'] = range(1, len(df) + 1)
+                
+                # get participant emails
+                participants = supabase.table('participants').select('id, email').execute()
+                if participants.data:
+                    participants_df = pd.DataFrame(participants.data)
+                    df = df.merge(participants_df, left_on='participant_id', right_on='id', how='left')
+                    df = df.rename(columns={'experience_years': 'experience'})
+                    return df.head(10)
+            return pd.DataFrame()
+        except Exception as fallback_error:
+            st.error(f"leaderboard error: {str(fallback_error)}")
+            return pd.DataFrame()
+
+
+def get_competition_stats():
+    """get overall competition statistics"""
+    if not supabase:
+        return None
+    
+    try:
+        # get all applications
+        apps = supabase.table('applications').select('score, experience_years').execute()
+        participants = supabase.table('participants').select('id').execute()
+        
+        if not apps.data or not participants.data:
+            return None
+        
+        df = pd.DataFrame(apps.data)
+        
+        stats = {
+            'total_participants': len(participants.data),
+            'avg_score': df['score'].mean(),
+            'top_score': df['score'].max(),
+            'high_scorers': len(df[df['score'] >= 80]),
+            'score_distribution': [
+                {'range': '0-60%', 'count': len(df[df['score'] < 60])},
+                {'range': '60-80%', 'count': len(df[(df['score'] >= 60) & (df['score'] < 80)])},
+                {'range': '80-100%', 'count': len(df[df['score'] >= 80])}
+            ],
+            'experience_distribution': [
+                {'range': '0-2 years', 'count': len(df[df['experience_years'] <= 2])},
+                {'range': '3-5 years', 'count': len(df[(df['experience_years'] >= 3) & (df['experience_years'] <= 5)])},
+                {'range': '6-8 years', 'count': len(df[(df['experience_years'] >= 6) & (df['experience_years'] <= 8)])},
+                {'range': '8+ years', 'count': len(df[df['experience_years'] > 8])}
+            ]
+        }
+        
+        return stats
+    except Exception as e:
+        st.error(f"stats error: {str(e)}")
+        return None
