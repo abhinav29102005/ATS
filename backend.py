@@ -248,6 +248,47 @@ def check_plagiarism(resume_text, reference_corpus=None):
         logger.error(f"Plagiarism check error: {e}")
         return 0, f"Error: {str(e)}"
 
+def calculate_keyword_similarity(resume_text, job_description):
+    """Calculate keyword similarity between resume and JD using TF-IDF"""
+    try:
+        vectorizer = TfidfVectorizer(stop_words='english', max_features=100)
+        tfidf_matrix = vectorizer.fit_transform([resume_text, job_description])
+        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+        return round(similarity * 100, 2)
+    except Exception as e:
+        logger.error(f"Keyword similarity error: {e}")
+        return 0
+
+def calculate_resume_quality_score(resume_text, parsed_data):
+    """Calculate overall resume quality score based on various factors"""
+    quality_score = 0
+    
+    # Length check (optimal resume length)
+    word_count = len(resume_text.split())
+    if 300 <= word_count <= 800:
+        quality_score += 2
+    elif 200 <= word_count < 300 or 800 < word_count <= 1000:
+        quality_score += 1
+    
+    # Sections check
+    if parsed_data.get('projects_section'):
+        quality_score += 2
+    if parsed_data.get('education_section'):
+        quality_score += 2
+    
+    # Skills diversity
+    skill_count = len(parsed_data.get('skills', []))
+    if skill_count >= 10:
+        quality_score += 2
+    elif skill_count >= 5:
+        quality_score += 1
+    
+    # Experience mentioned
+    if parsed_data.get('experience_years', 0) > 0:
+        quality_score += 2
+    
+    return min(quality_score, 10)  # Max 10 points
+
 def calculate_ats_score(resume_text, job_description, jd_education="", reference_corpus=None):
     if not resume_text or not job_description:
         raise Exception("Resume text and job description are required")
@@ -316,6 +357,7 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     else:
         feedback.append("Education doesn't match requirements")
     
+    # Calculate plagiarism score
     plagiarism_score = 0
     plag_status = "Not checked"
     if reference_corpus:
@@ -332,6 +374,12 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
             score -= 5
         
         feedback.append(f"Plagiarism check: {plagiarism_score}% similarity")
+    
+    # Calculate keyword similarity
+    keyword_similarity = calculate_keyword_similarity(resume_text, job_description)
+    
+    # Calculate resume quality score
+    resume_quality = calculate_resume_quality_score(resume_text, parsed)
     
     if parsed['experience_years'] > 20:
         penalties.append("Unrealistic experience years (-10 points)")
@@ -350,16 +398,19 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
         **parsed,
         'score': round(final_score, 2),
         'matched_skills': matched_skills,
+        'matched_skills_count': len(matched_skills),
         'feedback': feedback,
         'penalties': penalties,
-        'plagiarism_score': plagiarism_score
+        'plagiarism_score': plagiarism_score,
+        'keyword_similarity': keyword_similarity,
+        'resume_quality_score': resume_quality
     }
 
 def sanitize_input(text, max_length=500):
     if not text:
         return ""
     text = text.strip()[:max_length]
-    text = re.sub(r'[<>"\'\\;]', '', text)
+    text = re.sub(r'[<>"\';]', '', text)
     return text
 
 def validate_email(email):
@@ -389,7 +440,7 @@ def register_participant(name, email, mobile):
         if not name or len(name) < 3:
             raise Exception("Invalid name")
         if not validate_email(email):
-            raise Exception("Invalid email")
+            raise Exception("Invalid email - must be @thapar.edu")
         if not validate_mobile(mobile):
             raise Exception("Invalid mobile number")
         
@@ -424,29 +475,67 @@ def check_participant_exists(email):
         st.error(f"Error checking participant: {str(e)}")
         return None
 
-def save_participant_application(score, skills, experience_years, participant_id):
+def save_participant_application(participant_id, resume_text, ats_result):
+    """
+    Save application with all schema fields including plagiarism, keyword similarity, and quality score
+    
+    Parameters:
+    - participant_id: UUID of the participant
+    - resume_text: Full text of the resume for plagiarism corpus
+    - ats_result: Dictionary containing all ATS scoring results
+    """
     if not supabase:
         return False
     
     try:
         if not participant_id:
             raise Exception("Invalid participant ID")
+        
+        score = ats_result.get('score', 0)
         if not isinstance(score, (int, float)) or score < 0 or score > 100:
             raise Exception("Invalid score")
         
-        data = {
+        # Prepare application data with all schema fields
+        application_data = {
             'participant_id': participant_id,
             'score': float(score),
-            'skills_count': len(skills) if isinstance(skills, list) else 0,
-            'experience_years': int(experience_years) if experience_years else 0
+            'skills_count': len(ats_result.get('skills', [])),
+            'experience_years': float(ats_result.get('experience_years', 0)),
+            'matched_skills_count': ats_result.get('matched_skills_count', 0),
+            'plagiarism_score': float(ats_result.get('plagiarism_score', 0)),
+            'keyword_similarity': float(ats_result.get('keyword_similarity', 0)),
+            'resume_quality_score': float(ats_result.get('resume_quality_score', 0))
         }
         
-        supabase.table('applications').insert(data).execute()
+        # Insert application
+        supabase.table('applications').insert(application_data).execute()
+        
+        # Save resume text to corpus for plagiarism detection
+        corpus_data = {
+            'participant_id': participant_id,
+            'resume_text': resume_text
+        }
+        supabase.table('resume_corpus').insert(corpus_data).execute()
+        
         return True
     except Exception as e:
         logger.error(f"Save error: {e}")
         st.error(f"Error saving application: {str(e)}")
         return False
+
+def get_resume_corpus():
+    """Fetch all resume texts for plagiarism detection"""
+    if not supabase:
+        return []
+    
+    try:
+        response = supabase.table('resume_corpus').select('resume_text').execute()
+        if response.data:
+            return [item['resume_text'] for item in response.data]
+        return []
+    except Exception as e:
+        logger.error(f"Corpus fetch error: {e}")
+        return []
 
 def get_participant_upload_count(participant_id):
     if not supabase or not participant_id:
@@ -473,39 +562,50 @@ def get_participant_scores(participant_id):
         return pd.DataFrame()
 
 def get_leaderboard():
+    """Fetch leaderboard using the database view"""
     if not supabase:
         return pd.DataFrame()
     
     try:
-        response = supabase.table('applications').select('participant_id, score, skills_count, experience_years').execute()
+        # Use the leaderboard view created in schema
+        response = supabase.table('leaderboard').select('*').limit(100).execute()
         
         if not response.data:
             return pd.DataFrame()
         
         df = pd.DataFrame(response.data)
-        df = df.loc[df.groupby('participant_id')['score'].idxmax()]
-        df = df.sort_values('score', ascending=False).reset_index(drop=True)
-        df['rank'] = range(1, len(df) + 1)
+        return df
         
-        participants = supabase.table('participants').select('id, email').execute()
-        if participants.data:
-            participants_df = pd.DataFrame(participants.data)
-            df = df.merge(participants_df, left_on='participant_id', right_on='id', how='left')
-        
-        df = df.rename(columns={'experience_years': 'experience'})
-        return df[['rank', 'email', 'score', 'skills_count', 'experience']].head(10)
-        
-        return df.head(10)
     except Exception as e:
         logger.error(f"Leaderboard error: {e}")
-        return pd.DataFrame()
+        # Fallback to manual query if view doesn't exist
+        try:
+            response = supabase.table('applications').select('participant_id, score, skills_count, experience_years, matched_skills_count').execute()
+            
+            if not response.data:
+                return pd.DataFrame()
+            
+            df = pd.DataFrame(response.data)
+            df = df.loc[df.groupby('participant_id')['score'].idxmax()]
+            df = df.sort_values('score', ascending=False).reset_index(drop=True)
+            df['rank'] = range(1, len(df) + 1)
+            
+            participants = supabase.table('participants').select('id, email, name').execute()
+            if participants.data:
+                participants_df = pd.DataFrame(participants.data)
+                df = df.merge(participants_df, left_on='participant_id', right_on='id', how='left')
+            
+            return df[['rank', 'email', 'name', 'score', 'skills_count', 'experience_years', 'matched_skills_count']].head(100)
+        except Exception as fallback_error:
+            logger.error(f"Fallback leaderboard error: {fallback_error}")
+            return pd.DataFrame()
 
 def get_competition_stats():
     if not supabase:
         return None
     
     try:
-        apps = supabase.table('applications').select('score, experience_years').execute()
+        apps = supabase.table('applications').select('score, experience_years, plagiarism_score, keyword_similarity').execute()
         participants = supabase.table('participants').select('id').execute()
         
         if not apps.data or not participants.data:
@@ -515,11 +615,15 @@ def get_competition_stats():
         
         stats = {
             'total_participants': len(participants.data),
+            'total_submissions': len(df),
             'avg_score': float(df['score'].mean()),
             'top_score': float(df['score'].max()),
             'high_scorers': int(len(df[df['score'] >= 80])),
+            'avg_plagiarism': float(df['plagiarism_score'].mean()) if 'plagiarism_score' in df.columns else 0,
+            'avg_keyword_similarity': float(df['keyword_similarity'].mean()) if 'keyword_similarity' in df.columns else 0,
             'score_distribution': [
-                {'range': '0-60%', 'count': int(len(df[df['score'] < 60]))},
+                {'range': '0-40%', 'count': int(len(df[df['score'] < 40]))},
+                {'range': '40-60%', 'count': int(len(df[(df['score'] >= 40) & (df['score'] < 60)]))},
                 {'range': '60-80%', 'count': int(len(df[(df['score'] >= 60) & (df['score'] < 80)]))},
                 {'range': '80-100%', 'count': int(len(df[df['score'] >= 80]))}
             ],
