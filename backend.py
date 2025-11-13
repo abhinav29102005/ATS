@@ -13,7 +13,8 @@ import logging
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
-#spacy nlp
+
+# Spacy NLP
 @st.cache_resource
 def load_nlp():
     try:
@@ -28,7 +29,8 @@ def load_nlp():
         return None
 
 nlp = load_nlp()
-#supabase call
+
+# Supabase client
 @st.cache_resource
 def get_supabase_client():
     try:
@@ -45,17 +47,15 @@ def get_supabase_client():
         return None
 
 supabase: Client = get_supabase_client()
-#pdf validate
+
+# PDF validation
 def validate_pdf_file(uploaded_file):
     if uploaded_file is None:
         return False, "No file uploaded"
-    
     if uploaded_file.type != "application/pdf":
         return False, "File must be a PDF"
-    
     if uploaded_file.size > 20 * 1024 * 1024:
         return False, "File size exceeds 20MB limit"
-    
     return True, "Valid"
 
 def extract_pdf_text(uploaded_file):
@@ -88,7 +88,7 @@ def parse_resume(text):
         'Python', 'Java', 'JavaScript', 'SQL', 'AWS', 'Docker', 'Kubernetes',
         'React', 'Node.js', 'Django', 'Flask', 'PostgreSQL', 'MongoDB',
         'Machine Learning', 'Data Science', 'Git', 'CI/CD', 'Agile', 'Scrum',
-        'C++', 'C#', 'Ruby', 'PHP', 'Swift', 'Kotlin', 'TypeScript', 
+        'C++', 'C#', 'Ruby', 'PHP', 'Swift', 'Kotlin', 'TypeScript',
         'Angular', 'Vue.js', 'Spring', 'TensorFlow', 'PyTorch', 'Pandas',
         'NumPy', 'Scikit-learn', 'Spark', 'Hadoop', 'Kafka', 'Redis',
         'Elasticsearch', 'GraphQL', 'REST API', 'Microservices', 'HTML',
@@ -123,7 +123,7 @@ def parse_resume(text):
     education_section = extract_section(text, ['education', 'academic', 'qualification'])
     
     return {
-        'skills': skills, 
+        'skills': skills,
         'experience_years': experience_years,
         'projects_section': projects_section,
         'education_section': education_section
@@ -146,12 +146,12 @@ def extract_section(text, keywords):
         
         if capturing and line_lower and line.strip().isupper() and len(line.strip()) < 50:
             break
-            
+        
         if capturing:
             section_text += line + "\n"
     
     return section_text.strip()
-#projects and skills listed are same
+
 def validate_projects(projects_section, skills):
     if not projects_section or not skills:
         return 0, []
@@ -161,7 +161,7 @@ def validate_projects(projects_section, skills):
     verification_rate = len(verified_skills) / len(skills) if skills else 0
     
     return verification_rate, verified_skills
-#10 cg wali bkd
+
 def validate_education(education_section, jd_education):
     score = 0
     penalties = []
@@ -180,9 +180,9 @@ def validate_education(education_section, jd_education):
         if any(jd_deg in resume_degrees for jd_deg in jd_degrees):
             score += 15
         else:
-            score += 5  
+            score += 5
     elif resume_degrees and not jd_degrees:
-        score += 10  
+        score += 10
     
     cgpa_pattern = r'(?:cgpa|gpa|grade)[:\s]*(\d+\.?\d*)\s*(?:/\s*(\d+\.?\d*))?'
     cgpa_matches = re.findall(cgpa_pattern, edu_lower)
@@ -208,7 +208,7 @@ def validate_education(education_section, jd_education):
             continue
     
     fields = [
-        'computer science', 'software engineering', 'information technology', 
+        'computer science', 'software engineering', 'information technology',
         'electrical engineering', 'electronics', 'data science', 'artificial intelligence'
     ]
     
@@ -223,7 +223,7 @@ def validate_education(education_section, jd_education):
                 score += 5
     
     return max(0, score), penalties
-#penalty system
+
 def check_plagiarism(resume_text, reference_corpus=None):
     if not reference_corpus or len(reference_corpus) == 0:
         return 0, "No reference data"
@@ -239,13 +239,11 @@ def check_plagiarism(resume_text, reference_corpus=None):
         
         vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2), max_features=1000)
         tfidf_matrix = vectorizer.fit_transform(corpus)
-        
         similarities = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])
         max_similarity = float(np.max(similarities)) if similarities.size > 0 else 0.0
         plagiarism_score = round(max_similarity * 100, 2)
         
         return plagiarism_score, "Checked"
-        
     except Exception as e:
         logger.error(f"Plagiarism check error: {e}")
         return 0, f"Error: {str(e)}"
@@ -270,8 +268,8 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     penalties = []
     
     jd_lower = job_description.lower()
-    
     matched_skills = [s for s in parsed['skills'] if s.lower() in jd_lower]
+    
     if parsed['skills']:
         skills_score = (len(matched_skills) / len(parsed['skills'])) * 40
         score += skills_score
@@ -281,7 +279,6 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     
     exp_match = re.search(r'(\d+)\+?\s*years?', job_description.lower())
     required_exp = int(exp_match.group(1)) if exp_match else 2
-    
     if required_exp == 0:
         required_exp = 1
     
@@ -321,7 +318,6 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
     
     plagiarism_score = 0
     plag_status = "Not checked"
-    
     if reference_corpus:
         plagiarism_score, plag_status = check_plagiarism(resume_text, reference_corpus)
         
@@ -334,8 +330,8 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
         elif plagiarism_score > 40:
             penalties.append(f"Some plagiarism detected: {plagiarism_score}% (-5 points)")
             score -= 5
-    
-    feedback.append(f"Plagiarism check: {plagiarism_score}% similarity")
+        
+        feedback.append(f"Plagiarism check: {plagiarism_score}% similarity")
     
     if parsed['experience_years'] > 20:
         penalties.append("Unrealistic experience years (-10 points)")
@@ -346,12 +342,12 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
         if count > 15:
             penalties.append(f"Keyword stuffing detected: '{skill}' repeated {count} times (-5 points)")
             score -= 5
-            break 
+            break
     
     final_score = max(0, min(score, 100))
     
     return {
-        **parsed, 
+        **parsed,
         'score': round(final_score, 2),
         'matched_skills': matched_skills,
         'feedback': feedback,
@@ -362,30 +358,23 @@ def calculate_ats_score(resume_text, job_description, jd_education="", reference
 def sanitize_input(text, max_length=500):
     if not text:
         return ""
-    
     text = text.strip()[:max_length]
-    text = re.sub(r'[<>"\';]', '', text)
-    
+    text = re.sub(r'[<>"\'\\;]', '', text)
     return text
 
 def validate_email(email):
     if not email:
         return False
-    
     email = email.strip().lower()
     email_pattern = r'^[a-zA-Z0-9._%+-]+@thapar\.edu$'
-    
     return re.match(email_pattern, email) is not None
 
 def validate_mobile(mobile):
     if not mobile:
         return False
-    
     mobile_clean = re.sub(r'[\s\-\+()]', '', mobile)
-    
     if len(mobile_clean) < 10 or len(mobile_clean) > 15:
         return False
-    
     return mobile_clean.isdigit()
 
 def register_participant(name, email, mobile):
@@ -399,10 +388,8 @@ def register_participant(name, email, mobile):
         
         if not name or len(name) < 3:
             raise Exception("Invalid name")
-        
         if not validate_email(email):
             raise Exception("Invalid email")
-        
         if not validate_mobile(mobile):
             raise Exception("Invalid mobile number")
         
@@ -413,6 +400,7 @@ def register_participant(name, email, mobile):
             'email': email,
             'mobile': mobile
         }
+        
         supabase.table('participants').insert(data).execute()
         return participant_id
     except Exception as e:
@@ -443,7 +431,6 @@ def save_participant_application(score, skills, experience_years, participant_id
     try:
         if not participant_id:
             raise Exception("Invalid participant ID")
-        
         if not isinstance(score, (int, float)) or score < 0 or score > 100:
             raise Exception("Invalid score")
         
@@ -453,6 +440,7 @@ def save_participant_application(score, skills, experience_years, participant_id
             'skills_count': len(skills) if isinstance(skills, list) else 0,
             'experience_years': int(experience_years) if experience_years else 0
         }
+        
         supabase.table('applications').insert(data).execute()
         return True
     except Exception as e:
@@ -477,7 +465,6 @@ def get_participant_scores(participant_id):
     
     try:
         response = supabase.table('applications').select('*').eq('participant_id', participant_id).order('created_at', desc=True).execute()
-        
         if response.data:
             return pd.DataFrame(response.data)
         return pd.DataFrame()
@@ -496,18 +483,17 @@ def get_leaderboard():
             return pd.DataFrame()
         
         df = pd.DataFrame(response.data)
-        
         df = df.loc[df.groupby('participant_id')['score'].idxmax()]
         df = df.sort_values('score', ascending=False).reset_index(drop=True)
         df['rank'] = range(1, len(df) + 1)
         
         participants = supabase.table('participants').select('id, email').execute()
-        
         if participants.data:
             participants_df = pd.DataFrame(participants.data)
             df = df.merge(participants_df, left_on='participant_id', right_on='id', how='left')
-            df = df.rename(columns={'experience_years': 'experience'})
-            return df[['rank', 'email', 'score', 'skills_count', 'experience']].head(10)
+        
+        df = df.rename(columns={'experience_years': 'experience'})
+        return df[['rank', 'email', 'score', 'skills_count', 'experience']].head(10)
         
         return df.head(10)
     except Exception as e:
